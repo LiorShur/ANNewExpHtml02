@@ -1718,6 +1718,7 @@ textarea#comment-input {
       <button onclick="openTab('notes')">📝 הערות</button>
       <button onclick="openTab('media-gallery')">🖼️ גלריית מדיה</button>
       <button onclick="openTab('comments')">💬 תגובות</button>
+      <button onclick="openTab('share')">📤 שיתוף</button>
 
     </div>
 
@@ -1808,6 +1809,16 @@ textarea#comment-input {
   <button onclick="addComment()">➕ שלח תגובה</button>
 </section>
 
+<section id="share" class="tab-content">
+  <h3>📤 שיתוף המסלול</h3>
+  <div style="margin-bottom: 1em;">
+    <button onclick="shareWhatsApp()">📱 שלח ב-WhatsApp</button>
+    <button onclick="copyShareLink()">🔗 העתק קישור</button>
+    <button onclick="shareByEmail()">✉️ שלח באימייל</button>
+  </div>
+  <input type="text" id="share-link" readonly style="width:100%; padding: 8px;" />
+</section>
+
     
   </div>
 
@@ -1844,6 +1855,7 @@ function openTab(id) {
 
     // MAIN INITIALIZATION - FIXED
     window.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("share-link").value = getCurrentPageURL();
 route = JSON.parse("${routeDataEscaped}"); // must be before
   populateMediaGallery(); // now runs with data
   loadComments();
@@ -2028,6 +2040,30 @@ function addComment() {
 
   textarea.value = "";
   loadComments();
+}
+function getCurrentPageURL() {
+  return window.location.href;
+}
+
+function copyShareLink() {
+  const link = getCurrentPageURL();
+  const input = document.getElementById("share-link");
+  input.value = link;
+  input.select();
+  document.execCommand("copy");
+  alert("📎 הקישור הועתק ללוח!");
+}
+
+function shareWhatsApp() {
+  const text = encodeURIComponent("המסלול שלי: " + getCurrentPageURL());
+  window.open("https://wa.me/?text=" + text, "_blank");
+}
+
+function shareByEmail() {
+  const subject = encodeURIComponent("המסלול שלי");
+  const body = encodeURIComponent("הנה קישור למסלול שיצרתי:\n" + getCurrentPageURL());
+  window.location.href = "mailto:?subject=" + subject + "&body=" + body;
+
 }
 
 });
