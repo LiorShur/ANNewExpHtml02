@@ -1831,7 +1831,7 @@ let bounds = [];
     // Tab function
     let chartRendered = false;
 
-function openTab(id) {
+window.openTab = function(id) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
