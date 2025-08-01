@@ -1339,6 +1339,7 @@ async function generateElevationChartCanvas(route) {
   });
   return canvas;
 }
+
 async function exportRouteSummary() {
   const mostRecent = JSON.parse(localStorage.getItem("sessions") || "[]").slice(-1)[0];
   const defaultName = mostRecent?.name || "My Route";
@@ -1408,7 +1409,7 @@ L.marker([${entry.coords.lat}, ${entry.coords.lng}], {
 })
   .addTo(map)
   .bindTooltip("Photo ${photoCounter}")
-  .bindPopup("<b>Photo ${photoCounter}</b><br><img src='${safeImagePath}' style='width:200px'>");
+  .bindPopup("<b>Photo ${photoCounter}</b><br><img src='${safeImagePath}' style='width:200px' onclick='showFullScreen(this)'>");
 `;
 photoCounter++;
     } else if (entry.type === "audio") {
@@ -1691,8 +1692,15 @@ textarea#comment-input {
         <a href="${googleMapsURL}" target="_blank">📍 ניווט עם Google Maps</a> |
         <a href="${wazeURL}" target="_blank">🧭 ניווט עם Waze</a>
       </div>
-    </header>
-    
+      <h3>📤 שיתוף המסלול</h3>
+  <div style="margin-bottom: 1em;">
+    <button onclick="shareWhatsApp()">📱 שלח ב-WhatsApp</button>
+    <button onclick="copyShareLink()">🔗 העתק קישור</button>
+    <button onclick="shareByEmail()">✉️ שלח באימייל</button>
+  </div>
+   </header>
+
+       
     <div class="media-counts">
       <b>📸 תמונות:</b> ${photoCounter - 1} |
       <b>📝 הערות:</b> ${noteCounter - 1} |
@@ -1718,7 +1726,6 @@ textarea#comment-input {
       <button onclick="openTab('notes')">📝 הערות</button>
       <button onclick="openTab('media-gallery')">🖼️ גלריית מדיה</button>
       <button onclick="openTab('comments')">💬 תגובות</button>
-      <button onclick="openTab('share')">📤 שיתוף</button>
 
     </div>
 
@@ -1809,16 +1816,6 @@ textarea#comment-input {
   <button onclick="addComment()">➕ שלח תגובה</button>
 </section>
 
-<section id="share" class="tab-content">
-  <h3>📤 שיתוף המסלול</h3>
-  <div style="margin-bottom: 1em;">
-    <button onclick="shareWhatsApp()">📱 שלח ב-WhatsApp</button>
-    <button onclick="copyShareLink()">🔗 העתק קישור</button>
-    <button onclick="shareByEmail()">✉️ שלח באימייל</button>
-  </div>
-  <input type="text" id="share-link" readonly style="width:100%; padding: 8px;" />
-</section>
-
     
   </div>
 
@@ -1851,11 +1848,83 @@ window.openTab = function(id) {
 }
 }
 
+// Fullscreen photo viewer
+function showFullScreen(img) {
+  const overlay = document.createElement("div");
+  overlay.style.position = "fixed";
+  overlay.style.top = 0;
+  overlay.style.left = 0;
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.background = "rgba(0,0,0,0.9)";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.zIndex = "9999";
+  overlay.onclick = () => document.body.removeChild(overlay);
 
+  const fullImg = document.createElement("img");
+  fullImg.src = img.src;
+  fullImg.style.maxWidth = "90%";
+  fullImg.style.maxHeight = "90%";
+  overlay.appendChild(fullImg);
+  document.body.appendChild(overlay);
+}
+
+function loadComments() {
+  const comments = JSON.parse(localStorage.getItem("route_comments") || "[]");
+  const list = document.getElementById("comments-list");
+  list.innerHTML = "";
+  comments.forEach(comment => {
+    const div = document.createElement("div");
+    div.className = "comment";
+    div.textContent = comment;
+    list.appendChild(div);
+  });
+}
+
+function addComment() {
+  const textarea = document.getElementById("comment-input");
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const comments = JSON.parse(localStorage.getItem("route_comments") || "[]");
+  comments.push(text);
+  localStorage.setItem("route_comments", JSON.stringify(comments));
+
+  textarea.value = "";
+  loadComments();
+}
+
+function getCurrentPageURL() {
+  return window.location.href;
+}
+
+function copyShareLink() {
+  const url = getCurrentPageURL();
+  navigator.clipboard.writeText(url).then(() => {
+    alert("🔗 הקישור הועתק ללוח!");
+  }).catch(err => {
+    console.error("❌ Copy failed", err);
+    alert("❌ לא ניתן להעתיק את הקישור.");
+  });
+}
+
+function shareWhatsApp() {
+  const text = encodeURIComponent("המסלול שלי: " + getCurrentPageURL());
+  window.open("https://wa.me/?text=" + text, "_blank");
+}
+
+function shareByEmail() {
+  const subject = encodeURIComponent("המסלול שלי");
+  const body = encodeURIComponent('הנה קישור למסלול שיצרתי:  ' + getCurrentPageURL());
+  window.location.href = "mailto:?subject=" + subject + "&body=" + body;
+
+}
 
     // MAIN INITIALIZATION - FIXED
     window.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("share-link").value = getCurrentPageURL();
+     
 route = JSON.parse("${routeDataEscaped}"); // must be before
   populateMediaGallery(); // now runs with data
   loadComments();
@@ -2017,59 +2086,9 @@ route = JSON.parse("${routeDataEscaped}"); // must be before
   });
 }
       
-function loadComments() {
-  const comments = JSON.parse(localStorage.getItem("route_comments") || "[]");
-  const list = document.getElementById("comments-list");
-  list.innerHTML = "";
-  comments.forEach(comment => {
-    const div = document.createElement("div");
-    div.className = "comment";
-    div.textContent = comment;
-    list.appendChild(div);
-  });
-}
-
-function addComment() {
-  const textarea = document.getElementById("comment-input");
-  const text = textarea.value.trim();
-  if (!text) return;
-
-  const comments = JSON.parse(localStorage.getItem("route_comments") || "[]");
-  comments.push(text);
-  localStorage.setItem("route_comments", JSON.stringify(comments));
-
-  textarea.value = "";
-  loadComments();
-}
-function getCurrentPageURL() {
-  return window.location.href;
-}
-
-function copyShareLink() {
-  const link = getCurrentPageURL();
-  const input = document.getElementById("share-link");
-  input.value = link;
-  input.select();
-  document.execCommand("copy");
-  alert("📎 הקישור הועתק ללוח!");
-}
-
-function shareWhatsApp() {
-  const text = encodeURIComponent("המסלול שלי: " + getCurrentPageURL());
-  window.open("https://wa.me/?text=" + text, "_blank");
-}
-
-function shareByEmail() {
-  const subject = encodeURIComponent("המסלול שלי");
-  const body = encodeURIComponent("הנה קישור למסלול שיצרתי:\n" + getCurrentPageURL());
-  window.location.href = "mailto:?subject=" + subject + "&body=" + body;
-
-}
-
 });
 </script>
 <script>
-
 
 
       // Initialize elevation chart
@@ -2115,11 +2134,10 @@ function renderElevationChart() {
   });
 }
 
-
-
 </script>
 </body>
 </html>`;
+
 
   //Add media files to archive
   routeData.forEach((entry, i) => {
@@ -2150,13 +2168,13 @@ function renderElevationChart() {
   zip.file("index.html", htmlContent);
 
   // Add media files to ZIP
-  Object.entries(mediaForArchive).forEach(([filename, data]) => {
-    if (typeof data === 'object' && data.isBase64) {
-      zip.file(filename, data.content, { base64: true });
-    } else {
-      zip.file(filename, typeof data === 'object' ? data.content : data);
-    }
-  });
+  // Object.entries(mediaForArchive).forEach(([filename, data]) => {
+  //   if (typeof data === 'object' && data.isBase64) {
+  //     zip.file(filename, data.content, { base64: true });
+  //   } else {
+  //     zip.file(filename, typeof data === 'object' ? data.content : data);
+  //   }
+  // });
 
   // Generate and download ZIP
   try {
@@ -2175,6 +2193,842 @@ function renderElevationChart() {
   resetApp();
   initMap();
 }
+// async function exportRouteSummary() {
+//   const mostRecent = JSON.parse(localStorage.getItem("sessions") || "[]").slice(-1)[0];
+//   const defaultName = mostRecent?.name || "My Route";
+//   const name = prompt("📁 הזן שם לקובץ הסיכום:", defaultName);
+//   if (!name) return;
+
+//   if (!routeData || !Array.isArray(routeData) || routeData.length === 0) {
+//     alert("⚠️ No route data available to export. Please track or load a route first.");
+//     return;
+//   }
+
+//   console.log("✅ Route data exists, length:", routeData.length);
+
+//   const hasLocation = routeData.some(entry => entry.type === "location");
+//   if (!hasLocation) {
+//     alert("⚠️ No location data found in this session.");
+//     return;
+//   }
+
+//   console.log("✅ Has location data");
+
+//   const zip = new JSZip();
+//   const notesFolder = zip.folder("notes");
+//   const imagesFolder = zip.folder("images");
+//   const audioFolder = zip.folder("audio");
+//   const mediaForArchive = {};
+
+//   let markersJS = "";
+//   let pathCoords = [];
+//   let enriched = [];
+
+//   let noteCounter = 1;
+//   let photoCounter = 1;
+//   let audioCounter = 1;
+
+//   console.log("🔄 Processing route data...");
+
+//   // Process route data
+//   for (const entry of routeData) {
+//     if (entry.type === "location" || entry.type === "photo" || entry.type === "text" || entry.type === "audio") {
+//     enriched.push({ ...entry });
+//   }
+//     if (entry.type === "location") {
+//       pathCoords.push([entry.coords.lat, entry.coords.lng]);
+//       enriched.push({ ...entry });
+//     } else if (entry.type === "text") {
+//       notesFolder.file(`note${noteCounter}.txt`, entry.content);
+//       const safeNoteContent = encodeURIComponent(entry.content);
+
+// markersJS += `
+// L.marker([${entry.coords.lat}, ${entry.coords.lng}], {
+//   icon: L.divIcon({ className: 'custom-icon', html: '📝', iconSize: [24, 24] })
+// })
+//   .addTo(map)
+//   .bindTooltip("Note ${noteCounter}")
+//   .bindPopup("<b>Note ${noteCounter}</b><br><pre>" + decodeURIComponent("${safeNoteContent}") + "</pre>");
+// `;
+// noteCounter++;
+//     } else if (entry.type === "photo") {
+//       const base64Data = entry.content.split(",")[1];
+//       imagesFolder.file(`photo${photoCounter}.jpg`, base64Data, { base64: true });
+//       const safeImagePath = `images/photo${photoCounter}.jpg`;
+
+// markersJS += `
+// L.marker([${entry.coords.lat}, ${entry.coords.lng}], {
+//   icon: L.divIcon({ className: 'custom-icon', html: '📸', iconSize: [24, 24] })
+// })
+//   .addTo(map)
+//   .bindTooltip("Photo ${photoCounter}")
+//   .bindPopup("<b>Photo ${photoCounter}</b><br><img src='${safeImagePath}' style='width:200px'>");
+// `;
+// photoCounter++;
+//     } else if (entry.type === "audio") {
+//       const base64Data = entry.content.split(",")[1];
+//       audioFolder.file(`audio${audioCounter}.webm`, base64Data, { base64: true });
+//       markersJS += `
+// L.marker([${entry.coords.lat}, ${entry.coords.lng}])
+//   .addTo(map)
+//   .bindPopup("<b>Audio ${audioCounter}</b><br><audio controls src='audio/audio${audioCounter}.webm'></audio>");
+// `;
+//       audioCounter++;
+//     }
+//   }
+
+//   console.log("✅ Processed route data. PathCoords:", pathCoords.length, "Enriched:", enriched.length);
+
+//    // 🌍 Region detection via reverse geocoding
+// let detectedRegion = "";
+// try {
+//   const firstPoint = enriched.find(p => p.coords);
+//   if (firstPoint) {
+//     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${firstPoint.coords.lat}&lon=${firstPoint.coords.lng}`);
+//     const json = await res.json();
+//     detectedRegion = json?.address?.state || json?.address?.region || "";
+//     console.log("📍 Detected region:", detectedRegion);
+//   }
+// } catch (e) {
+//   console.warn("❌ Region detection failed:", e);
+// }
+
+// let startLat = "", startLng = "";
+// let googleMapsURL = "", wazeURL = "";
+
+// if (enriched.length > 0 && enriched[0].coords) {
+//   startLat = enriched[0].coords.lat;
+//   startLng = enriched[0].coords.lng;
+//   googleMapsURL = `https://www.google.com/maps/dir/?api=1&destination=${startLat},${startLng}`;
+//   wazeURL = `https://waze.com/ul?ll=${startLat},${startLng}&navigate=yes`;
+// }
+
+//   // Enrich with elevation
+// for (const entry of enriched) {
+//   if (entry.type === "location" && entry.elevation == null) {
+//     try {
+//       entry.elevation = await getElevation(entry.coords.lat, entry.coords.lng);
+//     } catch (e) {
+//       console.warn("Failed to get elevation for", entry.coords, e);
+//       entry.elevation = 0; // fallback
+//     }
+//   }
+// }
+
+
+//   // Accessibility computation
+//   let accessibleLength = 0;
+//   for (let i = 1; i < enriched.length; i++) {
+//     const a = enriched[i - 1], b = enriched[i];
+//     if (a.elevation != null && b.elevation != null) {
+//       const dist = haversineDistance(a.coords, b.coords);
+//       const elev = b.elevation - a.elevation;
+//       const grade = (elev / (dist * 1000)) * 100;
+//       if (Math.abs(grade) <= 6) accessibleLength += dist * 1000;
+//     }
+//   }
+
+//   // Load form data
+//   const formDataRaw = localStorage.getItem("accessibilityData");
+//   const data = formDataRaw ? JSON.parse(formDataRaw) : {};
+
+//   // Helpers
+//   const mapField = (key, fallback = '---') =>
+//     Array.isArray(data[key]) ? data[key].join(", ") : (data[key] || fallback);
+
+//   const getBoolLabel = (condition) => condition ? "✅ כן" : "❌ לא";
+
+//   // Calculate map bounds - FIXED: Check if pathCoords has data
+//   const boundsData = pathCoords.length >= 2 ? 
+//     [pathCoords[0], pathCoords[pathCoords.length - 1]] : 
+//     (pathCoords.length === 1 ? [pathCoords[0], pathCoords[0]] : [[32.0853, 34.7818], [32.0853, 34.7818]]); // Default to Tel Aviv if no coords
+
+
+//     console.log("🔍 Sample enriched data:", enriched.slice(0, 3));
+//   // Escape JSON data for HTML embedding - CRITICAL FIX
+//   const routeDataEscaped = JSON.stringify(enriched)
+//   .replace(/\\/g, '\\\\')
+//   .replace(/"/g, '\\"')
+//   .replace(/\n/g, '\\n')
+//   .replace(/\r/g, '\\r');
+//   const pathCoordsEscaped = JSON.stringify(pathCoords).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+//   const boundsEscaped = JSON.stringify(boundsData).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+//   console.log("Bounds data:", boundsData);
+//   console.log("Route data length:", enriched.length);
+//   console.log("Path coords length:", pathCoords.length);
+
+//   // Build HTML content with FIXED JavaScript embedding
+//   let htmlContent = `<!DOCTYPE html>
+// <html lang="he" dir="rtl">
+// <head>
+//   <meta charset="UTF-8">
+//   <title>${name}</title>
+//   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+//   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+//   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+//   <style>
+//     body {
+//       font-family: sans-serif;
+//       direction: rtl;
+//       background: #f0f0f0;
+//       margin: 0;
+//       padding: 20px;
+//     }
+//     .container {
+//       background: white;
+//       padding: 20px;
+//       max-width: 900px;
+//       margin: auto;
+//       box-shadow: 0 0 10px #ccc;
+//     }
+//     h1, h2, h3 {
+//       color: #2c5530;
+//     }
+//     ul {
+//       list-style: none;
+//       padding: 0;
+//     }
+//     li {
+//       margin-bottom: 5px;
+//     }
+//     .section {
+//       margin-bottom: 30px;
+//     }
+//     .media-counts {
+//       background: #e8f5e9;
+//       padding: 10px;
+//       border-radius: 5px;
+//       margin-bottom: 15px;
+//     }
+    
+//     .legend span {
+//       margin-left: 10px;
+//     }
+//     .tab-bar button {
+//       margin: 5px;
+//       padding: 8px 16px;
+//       border: 1px solid #ccc;
+//       background: #f5f5f5;
+//       cursor: pointer;
+//     }
+//     .tab-bar button.active {
+//       background: #2c5530;
+//       color: white;
+//     }
+//     .tab-bar {
+//       display: flex;
+//       gap: 10px;
+//       flex-wrap: wrap;
+//     }
+    
+//     .tab-content { 
+//       display: none; 
+//     } 
+//     .tab-content.active { 
+//       display: block; 
+//       margin-top: 20px; 
+//     }
+
+//     #map { 
+//       height: 400px; 
+//       width: 100%; 
+//       margin-bottom: 20px;
+//       border: 1px solid #ccc;
+//     } 
+//     #chart { 
+//       height: 300px;
+//   width: 100%;
+//   max-height: 300px;
+//   background: white;
+//   border: 1px solid #ccc;
+//     } 
+//       #chart-tab canvas {
+//   height: 300px !important;
+//   width: 100% !important;
+// }
+//     .map-section { 
+//       display: block; 
+//       margin-bottom: 30px; 
+//     }
+//     .custom-icon {
+//       text-align: center;
+//       line-height: 24px;
+//     }
+//       .hero-header {
+//   display: flex;
+//   flex-direction: column;
+//   align-items: center;
+//   margin-bottom: 20px;
+// }
+
+// .hero-header img {
+//   width: 100%;
+//   max-height: 300px;
+//   object-fit: cover;
+//   border-radius: 8px;
+//   margin-bottom: 10px;
+// }
+
+// .header-info {
+//   text-align: center;
+// }
+//   .media-grid {
+//   display: grid;
+//   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+//   gap: 10px;
+// }
+
+// .media-grid img {
+//   width: 100%;
+//   height: auto;
+//   border-radius: 6px;
+//   cursor: pointer;
+//   transition: transform 0.2s ease-in-out;
+// }
+
+// .media-grid img:hover {
+//   transform: scale(1.05);
+// }
+
+// .modal {
+//   display: none;
+//   position: fixed;
+//   z-index: 9999;
+//   top: 0; left: 0; right: 0; bottom: 0;
+//   background: rgba(0,0,0,0.8);
+//   justify-content: center;
+//   align-items: center;
+// }
+
+// .modal img {
+//   max-width: 90%;
+//   max-height: 90%;
+//   border-radius: 6px;
+// }
+//   .comments-list {
+//   margin-top: 15px;
+//   border-top: 1px solid #ccc;
+//   padding-top: 10px;
+// }
+
+// .comment {
+//   background: #f9f9f9;
+//   border: 1px solid #ddd;
+//   padding: 10px;
+//   margin-bottom: 10px;
+//   border-radius: 5px;
+//   white-space: pre-wrap;
+// }
+
+// textarea#comment-input {
+//   width: 100%;
+//   max-width: 100%;
+//   padding: 10px;
+//   margin-top: 10px;
+//   border-radius: 6px;
+//   border: 1px solid #ccc;
+//   resize: vertical;
+// }
+//   </style>
+// </head>
+// <body>
+//   <div class="container">
+//   <header class="hero-header">
+//       <img id="header-image" src = "images/photo1.jpg" alt="תמונת נוף" />
+//   <div class="header-info">
+//     <h1>🏞️ ${mapField("trailName")} – סיכום מסלול</h1>
+//       <p>אזור: ${detectedRegion || "לא זוהה אזור"}</p>
+//       <div>
+//         <a href="${googleMapsURL}" target="_blank">📍 ניווט עם Google Maps</a> |
+//         <a href="${wazeURL}" target="_blank">🧭 ניווט עם Waze</a>
+//       </div>
+//     </header>
+    
+//     <div class="media-counts">
+//       <b>📸 תמונות:</b> ${photoCounter - 1} |
+//       <b>📝 הערות:</b> ${noteCounter - 1} |
+//       <b>🎧 אודיו:</b> ${audioCounter - 1} |
+//       <b>♿ אורך נגיש:</b> ${Math.round(accessibleLength)} מ'
+//     </div>
+
+//     <h2>🔎 מידע כללי</h2>
+//     <ul>
+//       <li><b>שם השביל:</b> ${mapField("trailName")}</li>
+//       <li><b>מיקום:</b> ${mapField("location")}</li>
+//       <li><b>אורך (ק"מ):</b> ${mapField("trailLength")}</li>
+//       <li><b>משך משוער:</b> ${mapField("estimatedTime")}</li>
+//       <li><b>סוג מסלול:</b> ${mapField("trailType")}</li>
+//     </ul>
+
+//     <div class="tab-bar">
+//       <button onclick="openTab('map')" class="active">🗺️ מפה</button>
+//       <button onclick="openTab('chart')">📈 גרף גובה</button>
+//       <button onclick="openTab('accessibility')">♿ נגישות</button>
+//       <button onclick="openTab('terrain')">🛤️ טופוגרפיה</button>
+//       <button onclick="openTab('facilities')">🏕️ מתקנים</button>
+//       <button onclick="openTab('notes')">📝 הערות</button>
+//       <button onclick="openTab('media-gallery')">🖼️ גלריית מדיה</button>
+//       <button onclick="openTab('comments')">💬 תגובות</button>
+//       <button onclick="openTab('share')">📤 שיתוף</button>
+
+//     </div>
+
+//     <div id="map" class="tab-content active">
+//     <p>תוכן מפה כאן</p>
+//   </div>
+//   <div id="chart" class="tab-content">
+//     <canvas id="chart-canvas"></canvas>
+//     <div class="legend">
+//           <b>מקרא שיפועים:</b><br />
+//           <span style="color:green">🟩 ≤ 6% (קל)</span>
+//           <span style="color:orange">🟧 6–10% (בינוני)</span>
+//           <span style="color:red">🟥 > 10% (תלול)</span>
+//         </div>
+//   </div>
+        
+
+//     <div class="tab-content" id="accessibility">
+//       <h3>♿ פרטי נגישות</h3>
+//       <ul>
+//         <li><b>נגישות לכיסא גלגלים:</b> ${mapField("wheelchairAccess")}</li>
+//         <li><b>אביזרי ניידות תואמים:</b> ${mapField("mobilityAids")}</li>
+//         <li><b>מאפייני שטח:</b> ${mapField("terrainFeatures")}</li>
+//         <li><b>מאפיינים חזותיים:</b> ${mapField("visualFeatures")}</li>
+//         <li><b>תאורה:</b> ${mapField("lighting")}</li>
+//         <li><b>מכשולים חזותיים:</b> ${mapField("hazards")}</li>
+//         <li><b>נגיש לכלבי נחיה:</b> ${mapField("guideDogFriendly")}</li>
+//         <li><b>מאפיינים שמיעתיים:</b> ${mapField("hearingFeatures")}</li>
+//         <li><b>תקשורת חירום:</b> ${mapField("emergencyComm")}</li>
+//         <li><b>מורכבות ניווט:</b> ${mapField("navigationComplexity")}</li>
+//         <li><b>תמיכה קוגניטיבית:</b> ${mapField("cognitiveFeatures")}</li>
+//         <li><b>רמת רעש:</b> ${mapField("noiseLevel")}</li>
+//         <li><b>צפיפות:</b> ${mapField("crowdLevel")}</li>
+//       </ul>
+//     </div>
+
+//     <div class="tab-content" id="terrain">
+//       <h3>🛤️ סוג משטח וגובה</h3>
+//       <ul>
+//         <li><b>סוג משטח:</b> ${mapField("surfaceType")}</li>
+//         <li><b>רוחב השביל:</b> ${mapField("pathWidth")} מטרים</li>
+//         <li><b>מצב המשטח:</b> ${mapField("surfaceCondition")}</li>
+//         <li><b>שיפוע מרבי:</b> ${mapField("maxGrade")}%</li>
+//         <li><b>שיפוע ממוצע:</b> ${mapField("avgGrade")}%</li>
+//         <li><b>עלייה בגובה:</b> ${mapField("elevationGain")} מטרים</li>
+//         <li><b>מקטעים תלולים:</b> ${mapField("steepSections")}</li>
+//       </ul>
+//     </div>
+
+//     <div class="tab-content" id="facilities">
+//       <h3>🏕️ מתקנים ושירותים</h3>
+//       <ul>
+//         <li><b>חניה נגישה:</b> ${getBoolLabel(data.facilities?.includes("accessible-parking"))}</li>
+//         <li><b>מקומות חניה נגישה:</b> ${mapField("accessibleParkingSpaces")}</li>
+//         <li><b>שירותים נגישים:</b> ${getBoolLabel(data.facilities?.includes("accessible-restrooms"))}</li>
+//         <li><b>ברזיות:</b> ${getBoolLabel(data.facilities?.includes("water-fountains"))}</li>
+//         <li><b>אזורי פיקניק:</b> ${getBoolLabel(data.facilities?.includes("picnic-areas"))}</li>
+//         <li><b>מחסות:</b> ${getBoolLabel(data.facilities?.includes("shelters"))}</li>
+//         <li><b>מרכז מידע:</b> ${getBoolLabel(data.facilities?.includes("info-center"))}</li>
+//         <li><b>תשלום בכניסה:</b> ${mapField("entryFee")}</li>
+//         <li><b>תחבורה ציבורית:</b> ${mapField("publicTransport")}</li>
+//       </ul>
+//     </div>
+
+//     <div class="tab-content" id="notes">
+//       <h3>📝 הערות נוספות</h3>
+//       <ul>
+//         <li><b>זמנים מומלצים:</b> ${mapField("bestTimes")}</li>
+//         <li><b>הערות כלליות:</b><br>${mapField("additionalNotes")}</li>
+//         <li><b>שם הסוקר:</b> ${mapField("surveyorName")}</li>
+//         <li><b>תאריך הסקר:</b> ${mapField("surveyDate")}</li>
+//       </ul>
+//     </div>
+//     <section id="media-gallery" class="tab-content">
+//      <h3>🖼️ גלריית מדיה</h3>
+//      <div id="media-grid" class="media-grid"></div>
+//     </section>
+    
+//     <div id="image-modal" class="modal" onclick="this.style.display='none'">
+//      <img id="modal-image" src="">
+//     </div>
+
+//     <section id="comments" class="tab-content">
+//   <h3>💬 תגובות על המסלול</h3>
+//   <div id="comments-list" class="comments-list"></div>
+//   <textarea id="comment-input" placeholder="כתוב תגובה..." rows="3"></textarea>
+//   <br />
+//   <button onclick="addComment()">➕ שלח תגובה</button>
+// </section>
+
+// <section id="share" class="tab-content">
+//   <h3>📤 שיתוף המסלול</h3>
+//   <div style="margin-bottom: 1em;">
+//     <button onclick="shareWhatsApp()">📱 שלח ב-WhatsApp</button>
+//     <button onclick="copyShareLink()">🔗 העתק קישור</button>
+//     <button onclick="shareByEmail()">✉️ שלח באימייל</button>
+//   </div>
+//   <input type="text" id="share-link" readonly style="width:100%; padding: 8px;" />
+// </section>
+
+    
+//   </div>
+
+//   <script>
+
+//   let route = [];
+// let pathCoords = [];
+// let bounds = [];
+
+//     // Tab function
+//     let chartRendered = false;
+
+// window.openTab = function(id) {
+//   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+//   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+//   document.getElementById(id).classList.add('active');
+//   event.target.classList.add('active');
+
+//   // 🟢 Invalidate map only if tab is map
+//   if (id === 'map' && window.mapInstance) {
+//     setTimeout(() => {
+//       window.mapInstance.invalidateSize();
+//     }, 200);
+//   }
+
+//   // 🟢 Render chart if entering chart tab for first time
+//   if (id === 'chart' && !chartRendered) {
+//   renderElevationChart();
+//   chartRendered = true;
+// }
+// }
+
+
+
+//     // MAIN INITIALIZATION - FIXED
+//     window.addEventListener("DOMContentLoaded", () => {
+//     document.getElementById("share-link").value = getCurrentPageURL();
+// route = JSON.parse("${routeDataEscaped}"); // must be before
+//   populateMediaGallery(); // now runs with data
+//   loadComments();
+
+//       console.log("Chart.js version:", Chart?.version);
+//       console.log('DOMContentLoaded event fired');
+//       route = window.route;
+//       pathCoords = window.pathCoords;
+//       bounds = window.bounds;
+
+
+//       // Parse the route data - CRITICAL FIX: Properly parse escaped JSON
+//       const routeDataStr = "${routeDataEscaped}";
+//       const pathCoordsStr = "${pathCoordsEscaped}";
+//       const boundsStr = "${boundsEscaped}";
+      
+
+      
+//      try {
+//   route = JSON.parse(routeDataStr);
+//   pathCoords = JSON.parse(pathCoordsStr);
+//   bounds = JSON.parse(boundsStr);
+//  } catch (e) {
+//   console.error('JSON parsing error:', e);
+//   route = [];
+//   pathCoords = [];
+//   bounds = [[32.0853, 34.7818], [32.0853, 34.7818]];
+//  }
+
+
+
+//       console.log("Parsed route data:", route);
+//       console.log("Parsed path coords:", pathCoords);
+//       console.log("Parsed bounds:", bounds);
+
+//       // Check if we have valid data
+//       if (!route || route.length === 0) {
+//         console.warn('No route data available');
+//         document.getElementById('map').innerHTML = '<p>אין נתוני מסלול זמינים</p>';
+//         return;
+//       }
+
+//       // Initialize map
+//       try {
+//         const mapElement = document.getElementById('map');
+//         if (!mapElement) {
+//           console.error('Map element not found!');
+//           return;
+//         }
+
+//         const map = L.map('map');
+//         window.mapInstance = map; // Store globally for tab switching
+
+//         // Set view based on bounds or default
+//         if (pathCoords.length > 0) {
+//           const latLngs = pathCoords.map(coord => [coord[0], coord[1]]);
+//           map.fitBounds(latLngs);
+//         } else {
+//           map.setView([32.0853, 34.7818], 10); // Default to Tel Aviv
+//         }
+
+//         // Add tile layer
+//         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+//           maxZoom: 18,
+//           attribution: '&copy; OpenStreetMap contributors'
+//         }).addTo(map);
+
+//         // Add route polyline if we have path coordinates
+//         if (pathCoords.length > 1) {
+//           L.polyline(pathCoords, { color: 'blue', weight: 3 }).addTo(map);
+//         }
+
+//         // Haversine distance function
+//         const haversine = (a, b) => {
+//           const toRad = x => x * Math.PI / 180;
+//           const R = 6371;
+//           const dLat = toRad(b.lat - a.lat);
+//           const dLng = toRad(b.lng - a.lng);
+//           const lat1 = toRad(a.lat);
+//           const lat2 = toRad(b.lat);
+//           const a_ = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng/2) * Math.sin(dLng/2);
+//           return R * 2 * Math.atan2(Math.sqrt(a_), Math.sqrt(1-a_));
+//         };
+
+//         // Add colored route segments based on grade
+//         for (let i = 1; i < route.length; i++) {
+//           const a = route[i - 1];
+//           const b = route[i];
+          
+//           if (a.coords && b.coords && a.elevation != null && b.elevation != null) {
+//             const dist = haversine(a.coords, b.coords);
+//             const elev = b.elevation - a.elevation;
+//             const grade = (elev / (dist * 1000)) * 100;
+//             const color = Math.abs(grade) > 10 ? 'red' : Math.abs(grade) > 6 ? 'orange' : 'green';
+            
+//             L.polyline([[a.coords.lat, a.coords.lng], [b.coords.lat, b.coords.lng]], { 
+//               color: color, 
+//               weight: 4,
+//               opacity: 0.7
+//             }).addTo(map);
+//           }
+//         }
+
+//         // Add markers for start/end
+//         if (route.length > 0) {
+//           const startPoint = route[0];
+//           L.marker([startPoint.coords.lat, startPoint.coords.lng], {
+//             icon: L.divIcon({ 
+//               className: 'custom-icon', 
+//               html: '🏁', 
+//               iconSize: [30, 30] 
+//             })
+//           })
+//           .addTo(map)
+//           .bindPopup("<b>התחלת המסלול</b>");
+
+//           if (route.length > 1) {
+//             const endPoint = route[route.length - 1];
+//             L.marker([endPoint.coords.lat, endPoint.coords.lng], {
+//               icon: L.divIcon({ 
+//                 className: 'custom-icon', 
+//                 html: '🏁', 
+//                 iconSize: [30, 30] 
+//               })
+//             })
+//             .addTo(map)
+//             .bindPopup("<b>סוף המסלול</b>");
+//           }
+//         }
+
+//         // Add custom markers (photos, notes, etc.)
+//         ${markersJS}
+
+//         console.log('Map initialized successfully');
+
+//       } catch (mapError) {
+//         console.error('Error initializing map:', mapError);
+//       }
+      
+      
+
+//       function populateMediaGallery() {
+      
+//   const grid = document.getElementById("media-grid");
+//   console.log("populateMediaGallery running", grid, route);
+//   if (!grid || !route) return;
+
+//   const photos = route.filter(p => p.type === "photo");
+//   console.log("🖼️ Photos found:", photos);
+//   photos.forEach((photo, index) => {
+//     const img = document.createElement("img");
+//     img.src = "images/photo" + (index + 1) + ".jpg";
+//     img.alt = "תמונה " + (index + 1);
+//     img.onclick = () => {
+//       document.getElementById("modal-image").src = img.src;
+//       document.getElementById("image-modal").style.display = "flex";
+//     };
+//     grid.appendChild(img);
+//   });
+// }
+      
+// function loadComments() {
+//   const comments = JSON.parse(localStorage.getItem("route_comments") || "[]");
+//   const list = document.getElementById("comments-list");
+//   list.innerHTML = "";
+//   comments.forEach(comment => {
+//     const div = document.createElement("div");
+//     div.className = "comment";
+//     div.textContent = comment;
+//     list.appendChild(div);
+//   });
+// }
+
+// function addComment() {
+//   const textarea = document.getElementById("comment-input");
+//   const text = textarea.value.trim();
+//   if (!text) return;
+
+//   const comments = JSON.parse(localStorage.getItem("route_comments") || "[]");
+//   comments.push(text);
+//   localStorage.setItem("route_comments", JSON.stringify(comments));
+
+//   textarea.value = "";
+//   loadComments();
+// }
+// function getCurrentPageURL() {
+//   return window.location.href;
+// }
+
+// function copyShareLink() {
+//   const link = getCurrentPageURL();
+//   const input = document.getElementById("share-link");
+//   input.value = link;
+//   input.select();
+//   document.execCommand("copy");
+//   alert("📎 הקישור הועתק ללוח!");
+// }
+
+// function shareWhatsApp() {
+//   const text = encodeURIComponent("המסלול שלי: " + getCurrentPageURL());
+//   window.open("https://wa.me/?text=" + text, "_blank");
+// }
+
+// function shareByEmail() {
+//   const subject = encodeURIComponent("המסלול שלי");
+//   const body = encodeURIComponent("הנה קישור למסלול שיצרתי:\n" + getCurrentPageURL());
+//   window.location.href = "mailto:?subject=" + subject + "&body=" + body;
+
+// }
+
+// });
+// </script>
+// <script>
+
+
+
+//       // Initialize elevation chart
+// // Delay chart rendering to allow full layout
+// // console.log("Chart element found?", !!chartElement);
+// // console.log("Elevation data:", elevationData);
+// // console.log("Chart.js version:", Chart);
+
+// function renderElevationChart() {
+//   console.log("🟢 renderElevationChart CALLED");
+
+  
+
+//   const chartElement = document.getElementById("chart-canvas");
+//   if (!chartElement) {
+//     console.error('Chart canvas not found!');
+//     return;
+//   }
+
+//   const elevationData = route.map(p => p.elevation || 0);
+
+
+
+//   console.log("📊 Elevation data:", elevationData);
+
+//   new Chart(chartElement, {
+//     type: "line",
+//     data: {
+//       labels: route.map((_, i) => "נקודה " + (i + 1)),
+//       datasets: [{
+//         label: "גובה (מ')",
+//         data: elevationData,
+//         borderColor: "green",
+//         backgroundColor: "rgba(0, 255, 0, 0.1)",
+//         tension: 0.3,
+//         fill: true
+//       }]
+//     },
+//     options: {
+//       responsive: true,
+//       maintainAspectRatio: false
+//     }
+//   });
+// }
+
+
+
+// </script>
+// </body>
+// </html>`;
+
+//   //Add media files to archive
+//   routeData.forEach((entry, i) => {
+//     if (entry.type === "photo") {
+//       const base64 = entry.content?.split(",")[1];
+//       if (base64 && base64.length > 100) {
+//         mediaForArchive[`photo${i + 1}.jpg`] = { content: base64, isBase64: true };
+//       }
+//     } else if (entry.type === "text") {
+//       if (entry.content?.trim()) {
+//         mediaForArchive[`note${i + 1}.txt`] = { content: entry.content, isBase64: false };
+//       }
+//     }
+//   });
+
+//   // Save to archive if available
+//   if (typeof SummaryArchive !== 'undefined') {
+//     SummaryArchive.saveToArchive(name, htmlContent, mediaForArchive);
+//   }
+
+//   // Debug output
+//   console.log("=== FINAL HTML DEBUG ===");
+//   console.log("HTML length:", htmlContent.length);
+//   console.log("Route data length:", enriched.length);
+//   console.log("Path coords length:", pathCoords.length);
+  
+//   // Save HTML file to ZIP
+//   zip.file("index.html", htmlContent);
+
+//   // Add media files to ZIP
+//   Object.entries(mediaForArchive).forEach(([filename, data]) => {
+//     if (typeof data === 'object' && data.isBase64) {
+//       zip.file(filename, data.content, { base64: true });
+//     } else {
+//       zip.file(filename, typeof data === 'object' ? data.content : data);
+//     }
+//   });
+
+//   // Generate and download ZIP
+//   try {
+//     const blob = await zip.generateAsync({ type: "blob" });
+//     const url = URL.createObjectURL(blob);
+//     const a = document.createElement("a");
+//     a.href = url;
+//     a.download = `route-summary-${Date.now()}.zip`;
+//     a.click();
+//     console.log("✅ Route summary exported successfully.");
+//   } catch (e) {
+//     console.error("❌ Export failed:", e);
+//     alert("❌ Failed to export route summary.");
+//   }
+
+//   resetApp();
+//   initMap();
+// }
 
 // async function exportRouteSummary() {
 
