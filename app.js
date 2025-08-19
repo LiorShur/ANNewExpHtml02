@@ -861,7 +861,8 @@ window.saveSession = function () {
     exportData();
     exportGPX();
     exportPDF();
-    exportRouteSummary(); // ✅ Use your rich summary generator
+    //exportRouteSummary(); // ✅ Use your rich summary generator
+    prepareAndExport();
     alert("🛡 Storage full. Auto-exported full route summary as backup.");
     return false;
   }
